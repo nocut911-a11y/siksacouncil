@@ -10,6 +10,59 @@
   <meta name="theme-color" content="#1a1a2e" />
   <title>단양군의회 식사 ON</title>
 
+  <!-- PWA 인라인 매니페스트 -->
+  <script>
+    const manifestData = {
+      name: "단양군의회 식사 ON",
+      short_name: "식사ON",
+      description: "단양군의회 행사 참석 및 식사 관리 앱",
+      start_url: "./Siksa.html",
+      display: "standalone",
+      background_color: "#1a1a2e",
+      theme_color: "#1a1a2e",
+      orientation: "portrait",
+      icons: [
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%231a1a2e'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle'%3E%F0%9F%8D%B1%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231a1a2e'/%3E%3Ctext x='256' y='360' font-size='280' text-anchor='middle'%3E%F0%9F%8D%B1%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+      ]
+    };
+    const _mBlob = new Blob([JSON.stringify(manifestData)], {type:'application/json'});
+    const _mURL  = URL.createObjectURL(_mBlob);
+    document.addEventListener('DOMContentLoaded', () => {
+      const l = document.createElement('link');
+      l.rel = 'manifest'; l.href = _mURL;
+      document.head.appendChild(l);
+    });
+  </script>
+
+  <!-- Service Worker 등록 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          const CACHE='siksa-v1';
+          self.addEventListener('install', e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./Siksa.html'])));self.skipWaiting();});
+          self.addEventListener('activate', e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
+          self.addEventListener('fetch', e=>{e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});
+        `;
+        const swBlob = new Blob([swCode], {type:'application/javascript'});
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+      });
+    }
+    let _deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault(); _deferredPrompt = e;
+      document.getElementById('installBanner')?.classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('installBanner')?.classList.add('hidden');
+      _deferredPrompt = null;
+    });
+    function installApp() {
+      if (_deferredPrompt) { _deferredPrompt.prompt(); _deferredPrompt.userChoice.then(()=>{_deferredPrompt=null;}); }
+    }
+  </script>
+
   <!-- 🔥 Firebase 연동 완료 (siksa-ba0ef 프로젝트) -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -17,13 +70,13 @@
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
     const firebaseConfig = {
-      apiKey:            "AIzaSyAyjqHAg2_Q0r_t7VLDcWXCVoF1c1vzxn0",
-      authDomain:        "siksa-ba0ef.firebaseapp.com",
-      databaseURL:       "https://siksa-ba0ef-default-rtdb.firebaseio.com",
-      projectId:         "siksa-ba0ef",
-      storageBucket:     "siksa-ba0ef.firebasestorage.app",
-      messagingSenderId: "355001444598",
-      appId:             "1:355001444598:web:6f4dba8b5d7ea5771c24d7"
+      apiKey:            "AIzaSyAODyt9RPZh0VUQgU399aNm8uIxS-3VMQw",
+      authDomain:        "danyang-siksa.firebaseapp.com",
+      databaseURL:       "https://danyang-siksa-default-rtdb.firebaseio.com",
+      projectId:         "danyang-siksa",
+      storageBucket:     "danyang-siksa.firebasestorage.app",
+      messagingSenderId: "766178914074",
+      appId:             "1:766178914074:web:a50abb56705c24fd2706a3"
     };
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
@@ -302,9 +355,36 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .empty { text-align: center; padding: 40px 0; color: var(--text3); font-size: 16px; line-height: 1.8; }
+
+    /* 설치 배너 */
+    .install-banner {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: white; padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 99;
+    }
+    .install-banner.hidden { display: none; }
+    .install-banner .ib-icon { font-size: 28px; flex-shrink: 0; }
+    .install-banner .ib-text { flex: 1; font-size: 14px; line-height: 1.5; }
+    .install-banner .ib-text strong { font-size: 15px; display: block; margin-bottom: 2px; }
+    .install-banner .ib-btn {
+      background: white; color: #4f46e5; border: none;
+      border-radius: 10px; padding: 10px 16px; font-size: 14px;
+      font-weight: 800; cursor: pointer; flex-shrink: 0; font-family: inherit;
+    }
   </style>
 </head>
 <body>
+
+<!-- 설치 배너 -->
+<div class="install-banner hidden" id="installBanner">
+  <div class="ib-icon">🍱</div>
+  <div class="ib-text">
+    <strong>앱으로 설치하기</strong>
+    홈 화면에 추가하면 앱처럼 사용 가능합니다
+  </div>
+  <button class="ib-btn" onclick="installApp()">설치</button>
+</div>
 
 <!-- 로딩 오버레이 -->
 <div class="loading-overlay" id="loadingOverlay">
