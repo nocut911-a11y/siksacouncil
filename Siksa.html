@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="식사ON" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>단양군의회 식사 ON</title>
+
+  <!-- 🔥 Firebase 연동 완료 (danyang-siksa 프로젝트) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, remove, update }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAODyt9RPZh0VUQgU399aNm8uIxS-3VMQw",
+      authDomain:        "danyang-siksa.firebaseapp.com",
+      databaseURL:       "https://danyang-siksa-default-rtdb.firebaseio.com",
+      projectId:         "danyang-siksa",
+      storageBucket:     "danyang-siksa.firebasestorage.app",
+      messagingSenderId: "766178914074",
+      appId:             "1:766178914074:web:a50abb56705c24fd2706a3",
+      measurementId:     "G-S800RBPCC3"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // ── 전역 노출 (일반 스크립트에서 접근 가능하게) ──
+    window._db    = db;
+    window._ref   = ref;
+    window._set   = set;
+    window._push  = push;
+    window._onValue = onValue;
+    window._remove = remove;
+    window._update = update;
+    window._fbReady = true;
+    document.dispatchEvent(new Event('firebase-ready'));
+  </script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #f0f2f8;
+      --card: #ffffff;
+      --primary: #1a1a2e;
+      --accent: #4f46e5;
+      --green: #059669;
+      --green-bg: #d1fae5;
+      --green-text: #065f46;
+      --red: #dc2626;
+      --red-bg: #fee2e2;
+      --red-text: #991b1b;
+      --text: #111827;
+      --text2: #4b5563;
+      --text3: #9ca3af;
+      --border: #d1d5db;
+      --radius: 18px;
+      --shadow: 0 2px 14px rgba(0,0,0,0.09);
+    }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      font-size: 18px;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* App Header */
+    .app-header {
+      background: var(--primary);
+      padding: 52px 20px 20px;
+      padding-top: calc(52px + env(safe-area-inset-top));
+      color: white;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .app-header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.3px; }
+    .app-header p  { margin: 4px 0 0; font-size: 15px; opacity: 0.65; }
+
+    /* 연결 상태 표시 */
+    .conn-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 700; padding: 3px 10px;
+      border-radius: 999px; margin-top: 8px;
+    }
+    .conn-badge.online  { background: rgba(5,150,105,0.25); color: #6ee7b7; }
+    .conn-badge.offline { background: rgba(220,38,38,0.25);  color: #fca5a5; }
+    .conn-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .conn-badge.online  .conn-dot { background: #34d399; animation: blink 1.5s infinite; }
+    .conn-badge.offline .conn-dot { background: #f87171; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* Bottom Nav */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 2px solid var(--border);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 12px 0 10px;
+      border: none; background: transparent; cursor: pointer;
+      color: var(--text3); font-size: 13px; font-weight: 600; gap: 5px;
+      transition: color 0.15s;
+    }
+    .nav-btn.active { color: var(--accent); }
+    .nav-btn svg { width: 28px; height: 28px; }
+
+    /* Scroll Content */
+    .content { padding: 18px 16px 110px; }
+
+    /* 로딩 */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(26,26,46,0.85);
+      z-index: 500; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px; color: white;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 48px; height: 48px; border: 5px solid rgba(255,255,255,0.2);
+      border-top-color: #818cf8; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-txt { font-size: 16px; font-weight: 600; opacity: 0.85; }
+
+    /* Metric Cards */
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .metric-card {
+      background: var(--card); border-radius: var(--radius); padding: 20px 16px;
+      box-shadow: var(--shadow);
+    }
+    .metric-card .label { font-size: 14px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+    .metric-card .value { font-size: 38px; font-weight: 800; color: var(--text); line-height: 1; }
+    .metric-card.green .value { color: var(--green); }
+    .metric-card.red   .value { color: var(--red); }
+    .metric-card.purple .value { color: var(--accent); }
+
+    /* Section Header */
+    .section-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 22px 0 14px;
+    }
+    .section-hd h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--text); }
+    .section-hd .more-btn {
+      font-size: 15px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; font-weight: 600;
+    }
+
+    /* Event Card */
+    .event-card {
+      background: var(--card); border-radius: var(--radius); padding: 20px;
+      box-shadow: var(--shadow); margin-bottom: 14px;
+    }
+    .event-card .ev-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .event-card .ev-title { font-size: 19px; font-weight: 800; color: var(--text); margin: 0 0 8px; line-height: 1.3; }
+    .event-card .ev-meta { font-size: 15px; color: var(--text2); line-height: 2; }
+    .ev-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .ev-actions button {
+      border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; padding: 10px 14px; font-family: inherit;
+    }
+    .btn-edit   { background: #eff6ff; color: #1d4ed8; }
+    .btn-delete { background: var(--red-bg); color: var(--red); }
+
+    .ev-stats { display: flex; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+    .ev-stat  { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; }
+    .ev-stat.green { color: var(--green); }
+    .ev-stat.red   { color: var(--red); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .chip {
+      font-size: 14px; padding: 5px 14px; border-radius: 999px; font-weight: 600;
+    }
+    .chip-green { background: var(--green-bg); color: var(--green-text); }
+    .chip-red   { background: var(--red-bg);   color: var(--red-text); }
+
+    .status-badge {
+      display: inline-block; font-size: 13px; font-weight: 700;
+      padding: 4px 10px; border-radius: 999px; vertical-align: middle;
+    }
+    .status-진행중 { background: #dcfce7; color: #15803d; }
+    .status-완료   { background: #dbeafe; color: #1e40af; }
+    .status-취소   { background: #f3f4f6; color: #6b7280; }
+
+    /* Respond Panel */
+    .respond-card {
+      background: var(--card); border-radius: var(--radius); padding: 22px 20px;
+      box-shadow: var(--shadow);
+    }
+    .respond-card h2 { margin: 0 0 6px; font-size: 20px; font-weight: 800; }
+    .respond-card p  { margin: 0 0 18px; font-size: 15px; color: var(--text2); line-height: 1.6; }
+
+    .form-group  { margin-bottom: 16px; }
+    .form-label  { font-size: 15px; color: var(--text2); margin-bottom: 7px; display: block; font-weight: 700; }
+    select, input[type="text"], input[type="datetime-local"] {
+      width: 100%; padding: 15px 14px; border: 2px solid var(--border);
+      border-radius: 12px; font-size: 17px; background: white; font-family: inherit;
+      color: var(--text); -webkit-appearance: none; appearance: none;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; }
+    .big-btn {
+      border: none; border-radius: 14px; padding: 20px 10px; font-size: 18px; font-weight: 800;
+      cursor: pointer; transition: transform 0.1s, opacity 0.1s; font-family: inherit;
+      line-height: 1.3;
+    }
+    .big-btn:active { transform: scale(0.97); opacity: 0.85; }
+    .big-btn.green  { background: var(--green); color: white; }
+    .big-btn.red    { background: var(--red);   color: white; }
+
+    /* Attend preview */
+    .attend-preview { border-radius: 14px; padding: 16px; margin-top: 12px; }
+    .attend-preview.green { background: #f0fdf4; border: 2px solid #bbf7d0; }
+    .attend-preview.red   { background: #fff1f2; border: 2px solid #fecaca; }
+    .attend-preview .pv-label { font-size: 15px; font-weight: 800; margin-bottom: 10px; }
+    .attend-preview.green .pv-label { color: var(--green); }
+    .attend-preview.red   .pv-label { color: var(--red); }
+
+    /* Response DB */
+    .resp-item {
+      background: var(--card); border-radius: 14px; padding: 16px 18px;
+      box-shadow: var(--shadow); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .resp-avatar {
+      width: 50px; height: 50px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800; flex-shrink: 0;
+    }
+    .resp-avatar.green { background: var(--green-bg); color: var(--green); }
+    .resp-avatar.red   { background: var(--red-bg);   color: var(--red); }
+    .resp-info  { flex: 1; min-width: 0; }
+    .resp-name  { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+    .resp-sub   { font-size: 13px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .resp-badge { font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 999px; flex-shrink: 0; }
+    .resp-badge.green { background: var(--green-bg); color: var(--green-text); }
+    .resp-badge.red   { background: var(--red-bg);   color: var(--red-text); }
+
+    /* Filter Row */
+    .filter-row { display: flex; gap: 10px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      border: 2px solid var(--border); border-radius: 999px; padding: 10px 20px;
+      font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      background: white; color: var(--text2); transition: all 0.15s; font-family: inherit;
+    }
+    .filter-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    /* FAB */
+    .fab {
+      position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); right: 20px;
+      width: 62px; height: 62px; border-radius: 50%;
+      background: var(--accent); color: white; border: none; cursor: pointer;
+      font-size: 34px; display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 18px rgba(79,70,229,0.45);
+      z-index: 90; transition: transform 0.15s;
+    }
+    .fab:active { transform: scale(0.93); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 200; display: flex; align-items: flex-end;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-sheet {
+      background: white; border-radius: 24px 24px 0 0;
+      width: 100%; max-height: 92vh; overflow-y: auto;
+      padding: 28px 22px;
+      padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    }
+    .modal-handle {
+      width: 44px; height: 5px; background: #e5e7eb; border-radius: 3px;
+      margin: 0 auto 24px;
+    }
+    .modal-title { font-size: 22px; font-weight: 800; margin: 0 0 24px; }
+    .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+    .modal-actions button {
+      flex: 1; padding: 18px; border-radius: 14px; font-size: 17px;
+      font-weight: 800; border: none; cursor: pointer; font-family: inherit;
+    }
+    .modal-cancel { background: #f3f4f6; color: var(--text2); }
+    .modal-save   { background: var(--primary); color: white; }
+    .modal-del    { background: var(--red); color: white; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(90px + env(safe-area-inset-bottom)); left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #1f2937; color: white; padding: 14px 24px;
+      border-radius: 999px; font-size: 16px; font-weight: 600;
+      opacity: 0; transition: all 0.25s; white-space: nowrap;
+      z-index: 300; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .empty { text-align: center; padding: 40px 0; color: var(--text3); font-size: 16px; line-height: 1.8; }
+  </style>
+</head>
+<body>
+
+<!-- 로딩 오버레이 -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-txt">Firebase 연결 중…</div>
+</div>
+
+<div class="app-header">
+  <h1>🍱 단양군의회 식사 ON</h1>
+  <p>행사 참석 및 식사 참석 관리</p>
+  <div class="conn-badge offline" id="connBadge">
+    <div class="conn-dot"></div>
+    <span id="connTxt">연결 중…</span>
+  </div>
+</div>
+
+<div class="content" id="content"></div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-home" onclick="setTab('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+    홈
+  </button>
+  <button class="nav-btn" id="nav-respond" onclick="setTab('respond')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    응답
+  </button>
+  <button class="nav-btn" id="nav-manage" onclick="setTab('manage')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+    행사관리
+  </button>
+  <button class="nav-btn" id="nav-db" onclick="setTab('db')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    응답DB
+  </button>
+</nav>
+
+<!-- FAB -->
+<button class="fab" id="fab-btn" onclick="openAddModal()" title="행사 추가">+</button>
+
+<!-- Event Modal -->
+<div class="modal-overlay hidden" id="eventModal" onclick="closeModalBg(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title" id="modalTitle">행사 추가</h2>
+    <div class="form-group">
+      <label class="form-label">행사명 *</label>
+      <input type="text" id="f-title" placeholder="행사명을 입력하세요" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">일시 *</label>
+      <input type="datetime-local" id="f-datetime" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">장소</label>
+      <input type="text" id="f-location" placeholder="장소를 입력하세요" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">식당</label>
+      <input type="text" id="f-restaurant" placeholder="식당을 입력하세요" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">상태</label>
+      <select id="f-status">
+        <option>진행중</option>
+        <option>완료</option>
+        <option>취소</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">취소</button>
+      <button class="modal-save" onclick="saveEvent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay hidden" id="deleteModal" onclick="closeDeleteBg(event)">
+  <div class="modal-sheet" onclick="event.stopPropagation()" style="max-height: 340px;">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">행사 삭제</h2>
+    <p id="deleteMsg" style="font-size:16px; color:#4b5563; margin-bottom:24px; line-height:1.7;"></p>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeDeleteModal()">취소</button>
+      <button class="modal-del"    onclick="confirmDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   앱 상태
+═══════════════════════════════════════════════════════ */
+const MEMBERS = ['이상훈 의원','김영길 의원','장영갑 의원','조성룡 의원','강미숙 의원','오시백 의원','김혜숙 의원'];
+
+let events    = [];
+let responses = [];
+let currentTab = 'home';
+let editingId  = null;
+let deletingId = null;
+let respFilter = 'all';
+let selectedRespondEvId   = '';
+let selectedRespondMember = '';
+
+/* ═══════════════════════════════════════════════════════
+   유틸
+═══════════════════════════════════════════════════════ */
+function nowStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtDt(dt) { return dt ? dt.replace('T',' ') : ''; }
+
+function getAttendYes(evId) { return responses.filter(r => r.eventId===evId && r.eventAttend==='행사 참석'); }
+function getAttendNo(evId)  { return responses.filter(r => r.eventId===evId && r.eventAttend==='행사 불참'); }
+function getMeal(evId)      { return responses.filter(r => r.eventId===evId && r.mealAttend==='식사 참석'); }
+function getAbsent(evId)    { return responses.filter(r => r.eventId===evId && r.mealAttend==='식사 불참'); }
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type==='error' ? '#dc2626' : '#1f2937';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Firebase 초기화 & 실시간 리스너
+═══════════════════════════════════════════════════════ */
+document.addEventListener('firebase-ready', () => {
+  const db  = window._db;
+  const ref = window._ref;
+  const onValue = window._onValue;
+
+  // 연결 상태 감지
+  onValue(ref(db, '.info/connected'), snap => {
+    const badge = document.getElementById('connBadge');
+    const txt   = document.getElementById('connTxt');
+    if (snap.val()) {
+      badge.className = 'conn-badge online';
+      txt.textContent = '실시간 연결됨';
+    } else {
+      badge.className = 'conn-badge offline';
+      txt.textContent = '연결 끊김';
+    }
+  });
+
+  // 행사 데이터 실시간 구독
+  onValue(ref(db, 'events'), snap => {
+    const data = snap.val();
+    events = data
+      ? Object.entries(data).map(([fbKey, v]) => ({ ...v, fbKey }))
+      : [];
+    // 초기 데이터가 없으면 샘플 행사 1개 자동 등록
+    if (events.length === 0) {
+      fbAddEvent({
+        id: Date.now(),
+        title: '현충일 추념식',
+        datetime: '2026-06-06T09:55',
+        location: '단성면 충혼탑',
+        restaurant: '의회사무과',
+        status: '진행중'
+      });
+    }
+    hideLoading();
+    render();
+  });
+
+  // 응답 데이터 실시간 구독
+  onValue(ref(db, 'responses'), snap => {
+    const data = snap.val();
+    responses = data
+      ? Object.entries(data).map(([fbKey, v]) => ({ ...v, fbKey }))
+      : [];
+    render();
+    if (currentTab === 'respond' && selectedRespondEvId) updateAttendPreview();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════
+   Firebase CRUD
+═══════════════════════════════════════════════════════ */
+function fbAddEvent(ev) {
+  const db   = window._db;
+  const push = window._push;
+  const ref  = window._ref;
+  push(ref(db, 'events'), ev);
+}
+
+function fbUpdateEvent(fbKey, data) {
+  const db     = window._db;
+  const ref    = window._ref;
+  const update = window._update;
+  update(ref(db, `events/${fbKey}`), data);
+}
+
+function fbDeleteEvent(fbKey) {
+  const db     = window._db;
+  const ref    = window._ref;
+  const remove = window._remove;
+  remove(ref(db, `events/${fbKey}`));
+}
+
+function fbAddResponse(resp) {
+  const db   = window._db;
+  const push = window._push;
+  const ref  = window._ref;
+  return push(ref(db, 'responses'), resp);
+}
+
+function fbDeleteResponse(fbKey) {
+  const db     = window._db;
+  const ref    = window._ref;
+  const remove = window._remove;
+  remove(ref(db, `responses/${fbKey}`));
+}
+
+/* ═══════════════════════════════════════════════════════
+   로딩
+═══════════════════════════════════════════════════════ */
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+/* ═══════════════════════════════════════════════════════
+   탭 & 렌더
+═══════════════════════════════════════════════════════ */
+function setTab(tab) {
+  currentTab = tab;
+  ['home','respond','manage','db'].forEach(t => {
+    document.getElementById('nav-'+t).classList.toggle('active', t===tab);
+  });
+  document.getElementById('fab-btn').style.display =
+    (tab==='manage' || tab==='home') ? 'flex' : 'none';
+  render();
+}
+
+function render() {
+  const c = document.getElementById('content');
+  if      (currentTab==='home')    c.innerHTML = renderHome();
+  else if (currentTab==='respond') c.innerHTML = renderRespond();
+  else if (currentTab==='manage')  c.innerHTML = renderManage();
+  else if (currentTab==='db')      c.innerHTML = renderDB();
+  if (currentTab==='respond' && selectedRespondEvId) updateAttendPreview();
+}
+
+/* ── 홈 ── */
+function renderHome() {
+  const totalMeal   = events.reduce((s,e) => s + getMeal(e.id).length, 0);
+  const totalAbsent = events.reduce((s,e) => s + getAbsent(e.id).length, 0);
+  let html = `
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="label">전체 행사</div>
+        <div class="value">${events.length}</div>
+      </div>
+      <div class="metric-card purple">
+        <div class="label">총 응답</div>
+        <div class="value">${responses.length}</div>
+      </div>
+      <div class="metric-card green">
+        <div class="label">식사 참석</div>
+        <div class="value">${totalMeal}</div>
+      </div>
+      <div class="metric-card red">
+        <div class="label">식사 불참</div>
+        <div class="value">${totalAbsent}</div>
+      </div>
+    </div>
+    <div class="section-hd">
+      <h2>행사 현황</h2>
+      <button class="more-btn" onclick="setTab('manage')">관리 →</button>
+    </div>`;
+  if (events.length === 0) {
+    html += `<div class="empty">등록된 행사가 없습니다.<br>+ 버튼으로 추가하세요.</div>`;
+  } else {
+    events.forEach(ev => { html += renderEventCard(ev, false); });
+  }
+  return html;
+}
+
+/* ── 이벤트 카드 ── */
+function renderEventCard(ev, showActions) {
+  const meal   = getMeal(ev.id);
+  const absent = getAbsent(ev.id);
+  const mealChips   = meal.map(r   => `<span class="chip chip-green">${r.name.replace(' 의원','')}</span>`).join('');
+  const absentChips = absent.map(r => `<span class="chip chip-red">${r.name.replace(' 의원','')}</span>`).join('');
+  const actions = showActions ? `
+    <div class="ev-actions">
+      <button class="btn-edit"   onclick="openEditModal('${ev.fbKey}')">수정</button>
+      <button class="btn-delete" onclick="openDeleteModal('${ev.fbKey}')">삭제</button>
+    </div>` : '';
+  return `
+    <div class="event-card">
+      <div class="ev-top">
+        <div style="flex:1;min-width:0;">
+          <div class="ev-title">${ev.title}&nbsp;<span class="status-badge status-${ev.status}">${ev.status}</span></div>
+          <div class="ev-meta">
+            📅 ${fmtDt(ev.datetime)}<br>
+            ${ev.location   ? '📍 '+ev.location+'<br>'   : ''}
+            ${ev.restaurant ? '🏢 '+ev.restaurant         : ''}
+          </div>
+        </div>
+        ${actions}
+      </div>
+      <div class="ev-stats">
+        <span class="ev-stat green">🍱 식사 참석 ${meal.length}명</span>
+        <span class="ev-stat red">❌ 식사 불참 ${absent.length}명</span>
+      </div>
+      ${meal.length   > 0 ? `<div class="chips">${mealChips}</div>`   : ''}
+      ${absent.length > 0 ? `<div class="chips">${absentChips}</div>` : ''}
+    </div>`;
+}
+
+/* ── 응답 탭 ── */
+function renderRespond() {
+  const evOptions  = events.map(e =>
+    `<option value="${e.id}"${selectedRespondEvId==e.id?' selected':''}>${e.title}</option>`
+  ).join('');
+  const memOptions = MEMBERS.map(m =>
+    `<option value="${m}"${selectedRespondMember===m?' selected':''}>${m}</option>`
+  ).join('');
+  return `
+    <div class="respond-card">
+      <h2>응답 입력</h2>
+      <p>행사와 의원을 선택하신 후<br>아래 버튼을 눌러 응답해 주세요.</p>
+      <div class="form-group">
+        <label class="form-label">📋 행사 선택</label>
+        <select id="r-event" onchange="onRespondEvChange(this.value)">
+          <option value="">-- 행사를 선택하세요 --</option>
+          ${evOptions}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">👤 의원 선택</label>
+        <select id="r-member" onchange="selectedRespondMember=this.value">
+          <option value="">-- 의원을 선택하세요 --</option>
+          ${memOptions}
+        </select>
+      </div>
+      <div class="btn-row" style="grid-template-columns:1fr;">
+        <button class="big-btn green"  onclick="doRespond('attend_meal')">✅ 행사 참석 + 🍱 식사 참석</button>
+        <button class="big-btn" style="background:#f59e0b;color:white;" onclick="doRespond('attend_nomeal')">✅ 행사 참석 + ❌ 식사 불참</button>
+        <button class="big-btn red"    onclick="doRespond('absent')">❌ 행사 불참</button>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="big-btn" style="background:#6b7280;color:white;width:100%;padding:16px;" onclick="cancelResponse()">
+          ↩️ 응답 취소
+        </button>
+      </div>
+      <div id="attend-preview"></div>
+    </div>`;
+}
+
+function onRespondEvChange(val) {
+  selectedRespondEvId = val;
+  updateAttendPreview();
+}
+
+function updateAttendPreview() {
+  const container = document.getElementById('attend-preview');
+  if (!container) return;
+  const evId = parseInt(selectedRespondEvId);
+  if (!evId) { container.innerHTML = ''; return; }
+  const meal     = getMeal(evId);
+  const absent   = getAbsent(evId);
+  const attendYes = getAttendYes(evId);
+  const attendNo  = getAttendNo(evId);
+
+  container.innerHTML = `
+    <div class="attend-preview green" style="margin-top:14px;">
+      <div class="pv-label">✅ 행사 참석 (${attendYes.length}명)</div>
+      <div class="chips">${attendYes.length===0
+        ? '<span style="font-size:14px;color:#86efac;">아직 없음</span>'
+        : attendYes.map(r => `<span class="chip chip-green">${r.name}</span>`).join('')}</div>
+    </div>
+    <div class="attend-preview red" style="margin-top:10px;">
+      <div class="pv-label">❌ 행사 불참 (${attendNo.length}명)</div>
+      <div class="chips">${attendNo.length===0
+        ? '<span style="font-size:14px;color:#fca5a5;">아직 없음</span>'
+        : attendNo.map(r => `<span class="chip chip-red">${r.name}</span>`).join('')}</div>
+    </div>
+    <div class="attend-preview green" style="margin-top:10px;">
+      <div class="pv-label">🍱 식사 참석 (${meal.length}명)</div>
+      <div class="chips">${meal.length===0
+        ? '<span style="font-size:14px;color:#86efac;">아직 없음</span>'
+        : meal.map(r => `<span class="chip chip-green">${r.name}</span>`).join('')}</div>
+    </div>
+    <div class="attend-preview red" style="margin-top:10px;">
+      <div class="pv-label">🚫 식사 불참 (${absent.length}명)</div>
+      <div class="chips">${absent.length===0
+        ? '<span style="font-size:14px;color:#fca5a5;">아직 없음</span>'
+        : absent.map(r => `<span class="chip chip-red">${r.name}</span>`).join('')}</div>
+    </div>`;
+}
+
+/* ── 응답 등록 ── */
+function doRespond(type) {
+  const evId  = parseInt(selectedRespondEvId);
+  const member = selectedRespondMember || document.getElementById('r-member')?.value;
+
+  if (!evId)   { showToast('행사를 먼저 선택해 주세요.', 'error'); return; }
+  if (!member) { showToast('의원을 먼저 선택해 주세요.', 'error'); return; }
+
+  const already = responses.find(r => r.name===member && r.eventId===evId);
+  if (already)  { showToast(`${member}님은 이미 응답하셨습니다.`, 'error'); return; }
+
+  let eventAttend, mealAttend;
+  if (type === 'attend_meal')   { eventAttend='행사 참석'; mealAttend='식사 참석'; }
+  else if (type === 'attend_nomeal') { eventAttend='행사 참석'; mealAttend='식사 불참'; }
+  else                          { eventAttend='행사 불참'; mealAttend='식사 불참'; }
+
+  // Firebase에 저장 → 리스너가 자동으로 responses 업데이트
+  fbAddResponse({
+    id: Date.now(),
+    name: member,
+    eventId: evId,
+    eventAttend,
+    mealAttend,
+    time: nowStr()
+  });
+
+  showToast(`${member} 응답 등록 완료!`);
+  selectedRespondMember = '';
+  const memEl = document.getElementById('r-member');
+  if (memEl) memEl.value = '';
+}
+
+/* ── 응답 취소 ── */
+function cancelResponse() {
+  const evId   = parseInt(selectedRespondEvId);
+  const member = selectedRespondMember || document.getElementById('r-member')?.value;
+
+  if (!evId)   { showToast('행사를 먼저 선택해 주세요.', 'error'); return; }
+  if (!member) { showToast('의원을 먼저 선택해 주세요.', 'error'); return; }
+
+  const found = responses.find(r => r.eventId===evId && r.name===member);
+  if (!found)  { showToast('취소할 응답이 없습니다.', 'error'); return; }
+
+  fbDeleteResponse(found.fbKey);
+  showToast(`${member}님의 응답이 취소되었습니다.`);
+}
+
+/* ── 행사 관리 ── */
+function renderManage() {
+  if (events.length===0)
+    return `<div class="empty" style="margin-top:40px;">등록된 행사가 없습니다.<br>+ 버튼으로 추가하세요.</div>`;
+  return events.map(ev => renderEventCard(ev, true)).join('');
+}
+
+/* ── 응답 DB ── */
+function renderDB() {
+  const filterOpts = [['all','전체'],['meal','식사 참석'],['absent','행사 불참']];
+  const chips = filterOpts.map(([v,l]) =>
+    `<button class="filter-chip${respFilter===v?' active':''}" onclick="setFilter('${v}')">${l}</button>`
+  ).join('');
+  let filtered = responses;
+  if (respFilter==='meal')   filtered = responses.filter(r => r.mealAttend==='식사 참석');
+  if (respFilter==='absent') filtered = responses.filter(r => r.eventAttend==='행사 불참');
+  let items = '';
+  if (filtered.length===0) {
+    items = '<div class="empty">응답 데이터가 없습니다.</div>';
+  } else {
+    filtered.forEach(item => {
+      const ev      = events.find(e => e.id===item.eventId);
+      const isGreen = item.eventAttend==='행사 참석';
+      items += `
+        <div class="resp-item">
+          <div class="resp-avatar ${isGreen?'green':'red'}">${item.name.charAt(0)}</div>
+          <div class="resp-info">
+            <div class="resp-name">${item.name}</div>
+            <div class="resp-sub">${ev?ev.title:'(삭제된 행사)'} · ${item.eventAttend} · ${item.mealAttend} · ${item.time}</div>
+          </div>
+          <span class="resp-badge ${isGreen?'green':'red'}">${isGreen?'참석':'불참'}</span>
+        </div>`;
+    });
+  }
+  return `<div class="filter-row">${chips}</div>${items}`;
+}
+
+function setFilter(f) { respFilter=f; render(); }
+
+/* ── 모달 ── */
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '행사 추가';
+  ['f-title','f-location','f-restaurant'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('f-datetime').value = '';
+  document.getElementById('f-status').value   = '진행중';
+  document.getElementById('eventModal').classList.remove('hidden');
+}
+
+function openEditModal(fbKey) {
+  editingId = fbKey;
+  const ev = events.find(e => e.fbKey===fbKey);
+  if (!ev) return;
+  document.getElementById('modalTitle').textContent  = '행사 수정';
+  document.getElementById('f-title').value           = ev.title;
+  document.getElementById('f-datetime').value        = ev.datetime;
+  document.getElementById('f-location').value        = ev.location;
+  document.getElementById('f-restaurant').value      = ev.restaurant;
+  document.getElementById('f-status').value          = ev.status;
+  document.getElementById('eventModal').classList.remove('hidden');
+}
+
+function closeModal()    { document.getElementById('eventModal').classList.add('hidden'); }
+function closeModalBg(e) { if(e.target===document.getElementById('eventModal')) closeModal(); }
+
+function saveEvent() {
+  const title    = document.getElementById('f-title').value.trim();
+  const datetime = document.getElementById('f-datetime').value;
+  if (!title)    { showToast('행사명을 입력해 주세요.', 'error'); return; }
+  if (!datetime) { showToast('일시를 입력해 주세요.',   'error'); return; }
+  const form = {
+    title, datetime,
+    location:   document.getElementById('f-location').value.trim(),
+    restaurant: document.getElementById('f-restaurant').value.trim(),
+    status:     document.getElementById('f-status').value
+  };
+  if (editingId) {
+    fbUpdateEvent(editingId, form);
+    showToast('행사가 수정되었습니다.');
+  } else {
+    fbAddEvent({ ...form, id: Date.now() });
+    showToast('행사가 추가되었습니다.');
+  }
+  closeModal();
+}
+
+function openDeleteModal(fbKey) {
+  deletingId = fbKey;
+  const ev = events.find(e => e.fbKey===fbKey);
+  document.getElementById('deleteMsg').textContent =
+    `"${ev?.title}"을(를) 삭제하면 관련 응답도 모두 삭제됩니다. 계속하시겠습니까?`;
+  document.getElementById('deleteModal').classList.remove('hidden');
+}
+function closeDeleteModal()    { document.getElementById('deleteModal').classList.add('hidden'); deletingId=null; }
+function closeDeleteBg(e)      { if(e.target===document.getElementById('deleteModal')) closeDeleteModal(); }
+
+function confirmDelete() {
+  if (!deletingId) return;
+  const ev = events.find(e => e.fbKey===deletingId);
+  // 관련 응답도 함께 삭제
+  responses
+    .filter(r => r.eventId === ev?.id)
+    .forEach(r => fbDeleteResponse(r.fbKey));
+  fbDeleteEvent(deletingId);
+  showToast('행사가 삭제되었습니다.', 'error');
+  closeDeleteModal();
+}
+
+/* ── 초기 렌더 (Firebase 연결 전 빈 화면 방지) ── */
+render();
+</script>
+</body>
+</html>
